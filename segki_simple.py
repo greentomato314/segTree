@@ -1,69 +1,76 @@
 import sys
 import math
-sys.setrecursionlimit(10**8)
+sys.setrecursionlimit(10**7)
+
 class segki():
-    #modeで関数を選べます。(min,max,sum,prd(product),gcd,lmc,^,&,|)
-    def __init__(self,N,ls,mode='min'): #葉の数N,要素ls
-        self.mode = mode
-        self.default = self.setdef()
+    DEFAULT = {
+        'min': 1 << 60,
+        'max': -(1 << 60),
+        'sum': 0,
+        'prd': 1,
+        'gcd': 0,
+        'lmc': 1,
+        '^': 0,
+        '&': (1 << 60) - 1,
+        '|': 0,
+    }
+
+    FUNC = {
+        'min': min,
+        'max': max,
+        'sum': (lambda x, y: x + y),
+        'prd': (lambda x, y: x * y),
+        'gcd': math.gcd,
+        'lmc': (lambda x, y: (x * y) // math.gcd(x, y)),
+        '^': (lambda x, y: x ^ y),
+        '&': (lambda x, y: x & y),
+        '|': (lambda x, y: x | y),
+    }
+
+    def __init__(self, N, ls, mode='min'):
+        """
+        葉の数N, 要素ls, 関数mode (min,max,sum,prd(product),gcd,lmc,^,&,|)
+        """
+        self.default = self.DEFAULT[mode]
+        self.func = self.FUNC[mode]
         self.N = N
-        self.K = len(bin(self.N))-3
-        if self.N%(2**(self.K)) != 0:
-            self.K += 1
-        self.dat = [self.default]*(2**(self.K+1))
-        for i in range(self.N): #葉の構築
-            self.dat[2**self.K-1+i] = ls[i]
+        self.K = (N - 1).bit_length()
+        self.N2 = 1 << self.K
+        self.dat = [self.default] * (2**(self.K + 1))
+        for i in range(self.N):  # 葉の構築
+            self.dat[self.N2 + i] = ls[i]
         self.build()
-    
-    def setdef(self):
-        if self.mode == 'min':return 1 << 60
-        elif self.mode == 'max':return -(1 << 60)
-        elif self.mode == 'sum':return 0
-        elif self.mode == 'prd':return 1
-        elif self.mode == 'gcd':return 0
-        elif self.mode == 'lmc':return 1
-        elif self.mode == '^':return 0
-        elif self.mode == '&':return (1 << 60)-1
-        elif self.mode == '|':return 0
-    
+
     def build(self):
-        for j in range(2**self.K-2,-1,-1):
-            self.dat[j] = self.func(self.dat[2*j+1],self.dat[2*j+2]) #親が持つ条件
+        for j in range(self.N2 - 1, -1, -1):
+            self.dat[j] = self.func(self.dat[j << 1], self.dat[j << 1 | 1])  # 親が持つ条件
 
-    def func(self,x,y):#関数を指定
-        if self.mode == 'min': return min(x,y)
-        elif self.mode == 'max': return max(x,y)
-        elif self.mode == 'sum': return x+y
-        elif self.mode == 'prd': return x*y
-        elif self.mode == 'gcd': return math.gcd(x,y)
-        elif self.mode == 'lmc': return (x*y)//math.gcd(x,y)
-        elif self.mode == '^': return x^y
-        elif self.mode == '&': return x&y
-        elif self.mode == '|': return x|y
-    
-    def leafvalue(self,x):
-        return self.dat[x+2**self.K-1]
+    def leafvalue(self, x):  # リストのx番目の値
+        return self.dat[x + self.N2]
 
-    def update(self,x,y): #index(x)をyに変更
-        i = x+2**self.K-1
+    def update(self, x, y):  # index(x)をyに変更
+        i = x + self.N2
         self.dat[i] = y
-        while (i>0): #親の値を変更
-            i = (i-1)//2
-            self.dat[i] = self.func(self.dat[2*i+1],self.dat[2*i+2])
+        while i > 0:  # 親の値を変更
+            i >>= 1
+            self.dat[i] = self.func(self.dat[i << 1], self.dat[i << 1 | 1])
         return
 
-    def query(self,a,b): #区間a,bの処理
-        return self.query_sub(a,b,0,0,2**self.K)
-    
-    def query_sub(self,a,b,k,l,r):
-        if r <= a or b <= l:
-            return self.default
-        if (a <= l and r <= b):
-            return self.dat[k]
-        else:
-            vl = self.query_sub(a, b, k * 2 + 1, l, (l + r) // 2)
-            vr = self.query_sub(a, b, k * 2 + 2, (l + r) // 2, r)
-            return self.func(vl,vr)
+    def query(self, L, R):  # [L,R)の区間取得
+        L += self.N2
+        R += self.N2
+        vL = self.default
+        vR = self.default
+        while L < R:
+            if L & 1:
+                vL = self.func(vL, self.dat[L])
+                L += 1
+            if R & 1:
+                R -= 1
+                vR = self.func(self.dat[R], vR)
+            L >>= 1
+            R >>= 1
+        return self.func(vL, vR)
 
 
 if __name__ == "__main__":
